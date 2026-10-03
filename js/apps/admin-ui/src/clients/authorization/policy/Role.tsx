@@ -40,9 +40,9 @@ export const Role = () => {
           roles.map(async (role) => ({
             role: role!,
             client: role!.clientRole
-              ? await adminClient.clients.findOne({
+              ? ((await adminClient.clients.findOne({
                   id: role?.containerId!,
-                })
+                })) ?? undefined)
               : undefined,
           })),
         );

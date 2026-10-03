@@ -45,7 +45,9 @@ export const RoleSelect = ({ name, isRadio = false }: RoleSelectorProps) => {
           roles.map(async (role) => ({
             role: role!,
             client: role!.clientRole
-              ? await adminClient.clients.findOne({ id: role?.containerId! })
+              ? ((await adminClient.clients.findOne({
+                  id: role?.containerId!,
+                })) ?? undefined)
               : undefined,
           })),
         );
