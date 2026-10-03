@@ -55,20 +55,39 @@ public class SamlSPDescriptorClientInstallation implements ClientInstallationPro
     public static final String SAML_CLIENT_INSTALATION_SP_DESCRIPTOR = "saml-sp-descriptor";
     private static final String FALLBACK_ERROR_URL_STRING = "ERROR:ENDPOINT_NOT_SET";
 
+    /**
+     * @return the URL that the SP descriptor of the client gives as its assertion consumer service, or null when
+     * neither the URL for the binding of the client nor the fallback URL is set
+     */
+    public static String getAssertionConsumerUrl(ClientModel client) {
+        SamlClient samlClient = new SamlClient(client);
+        String assertionUrl;
+
+        if (samlClient.forceArtifactBinding()) {
+            assertionUrl = client.getAttribute(SamlProtocol.SAML_ASSERTION_CONSUMER_URL_ARTIFACT_ATTRIBUTE);
+        } else if (samlClient.forcePostBinding()) {
+            assertionUrl = client.getAttribute(SamlProtocol.SAML_ASSERTION_CONSUMER_URL_POST_ATTRIBUTE);
+        } else { //redirect binding
+            assertionUrl = client.getAttribute(SamlProtocol.SAML_ASSERTION_CONSUMER_URL_REDIRECT_ATTRIBUTE);
+        }
+
+        if (assertionUrl == null || assertionUrl.trim().isEmpty()) assertionUrl = client.getManagementUrl();
+        if (assertionUrl == null || assertionUrl.trim().isEmpty()) return null;
+        return assertionUrl;
+    }
+
     public static String getSPDescriptorForClient(ClientModel client) {
         try {
             SamlClient samlClient = new SamlClient(client);
-            String assertionUrl;
+            String assertionUrl = getAssertionConsumerUrl(client);
             String logoutUrl;
             URI loginBinding;
             URI logoutBinding = null;
 
             if (samlClient.forcePostBinding()) {
-                assertionUrl = client.getAttribute(SamlProtocol.SAML_ASSERTION_CONSUMER_URL_POST_ATTRIBUTE);
                 logoutUrl = client.getAttribute(SamlProtocol.SAML_SINGLE_LOGOUT_SERVICE_URL_POST_ATTRIBUTE);
                 loginBinding = JBossSAMLURIConstants.SAML_HTTP_POST_BINDING.getUri();
             } else { //redirect binding
-                assertionUrl = client.getAttribute(SamlProtocol.SAML_ASSERTION_CONSUMER_URL_REDIRECT_ATTRIBUTE);
                 logoutUrl = client.getAttribute(SamlProtocol.SAML_SINGLE_LOGOUT_SERVICE_URL_REDIRECT_ATTRIBUTE);
                 loginBinding = JBossSAMLURIConstants.SAML_HTTP_REDIRECT_BINDING.getUri();
             }
@@ -81,13 +100,11 @@ public class SamlSPDescriptorClientInstallation implements ClientInstallationPro
                     logoutBinding = loginBinding;
                 }
                 
-                assertionUrl = client.getAttribute(SamlProtocol.SAML_ASSERTION_CONSUMER_URL_ARTIFACT_ATTRIBUTE);
                 loginBinding = JBossSAMLURIConstants.SAML_HTTP_ARTIFACT_BINDING.getUri();
 
             }
 
-            if (assertionUrl == null || assertionUrl.trim().isEmpty()) assertionUrl = client.getManagementUrl();
-            if (assertionUrl == null || assertionUrl.trim().isEmpty()) assertionUrl = FALLBACK_ERROR_URL_STRING;
+            if (assertionUrl == null) assertionUrl = FALLBACK_ERROR_URL_STRING;
             if (logoutUrl == null || logoutUrl.trim().isEmpty()) logoutUrl = client.getManagementUrl();
             if (logoutUrl == null || logoutUrl.trim().isEmpty()) logoutUrl = FALLBACK_ERROR_URL_STRING;
             if (logoutBinding == null) logoutBinding = loginBinding;

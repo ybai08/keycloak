@@ -39,6 +39,7 @@ import org.keycloak.protocol.ClientInstallationProvider;
 import org.keycloak.protocol.saml.SamlClient;
 import org.keycloak.protocol.saml.SamlProtocol;
 import org.keycloak.protocol.saml.SamlService;
+import org.keycloak.services.ErrorResponse;
 
 /**
  * @author <a href="mailto:bill@burkecentral.com">Bill Burke</a>
@@ -47,6 +48,10 @@ import org.keycloak.protocol.saml.SamlService;
 public class ModAuthMellonClientInstallation implements ClientInstallationProvider {
     @Override
     public Response generateInstallation(KeycloakSession session, RealmModel realm, ClientModel client, URI serverBaseUri) {
+        if (SamlSPDescriptorClientInstallation.getAssertionConsumerUrl(client) == null) {
+            throw ErrorResponse.error("The client has no Assertion Consumer Service URL. Set the Assertion Consumer Service URL for the binding of the client, or the Master SAML Processing URL, before downloading the mod_auth_mellon files.", Response.Status.BAD_REQUEST);
+        }
+
         SamlClient samlClient = new SamlClient(client);
         ByteArrayOutputStream baos = new ByteArrayOutputStream();
         ZipOutputStream zip = new ZipOutputStream(baos);

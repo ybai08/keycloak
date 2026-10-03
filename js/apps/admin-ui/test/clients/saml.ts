@@ -60,6 +60,11 @@ export async function saveSamlSettings(page: Page) {
   await page.getByTestId("settings-save").click();
 }
 
+export async function assertDownloadRefused(page: Page, message: string) {
+  await expect(page.getByText(message)).toBeVisible();
+  await expect(page.getByTestId("confirm")).toBeDisabled();
+}
+
 export async function goToKeysTab(page: Page) {
   await page.getByTestId("keysTab").click();
 }

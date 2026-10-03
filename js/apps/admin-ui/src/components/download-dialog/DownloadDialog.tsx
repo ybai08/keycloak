@@ -1,6 +1,7 @@
-import { fetchWithError } from "@keycloak/keycloak-admin-client";
+import { NetworkError, fetchWithError } from "@keycloak/keycloak-admin-client";
 import { HelpItem, useFetch, useHelp } from "@keycloak/keycloak-ui-shared";
 import {
+  Alert,
   Form,
   FormGroup,
   MenuToggle,
@@ -47,6 +48,7 @@ export const DownloadDialog = ({
     configFormats[configFormats.length - 1].id,
   );
   const [snippet, setSnippet] = useState<string | ArrayBuffer>();
+  const [error, setError] = useState<string>();
   const [openType, setOpenType] = useState(false);
 
   const selectedConfig = useMemo(
@@ -63,19 +65,28 @@ export const DownloadDialog = ({
   useFetch(
     async () => {
       if (selectedConfig?.mediaType === "application/zip") {
-        const response = await fetchWithError(
-          `${addTrailingSlash(
-            adminClient.baseUrl,
-          )}admin/realms/${realm}/clients/${id}/installation/providers/${selected}`,
-          {
-            method: "GET",
-            headers: getAuthorizationHeaders(
-              await adminClient.getAccessToken(),
-            ),
-          },
-        );
+        try {
+          const response = await fetchWithError(
+            `${addTrailingSlash(
+              adminClient.baseUrl,
+            )}admin/realms/${realm}/clients/${id}/installation/providers/${selected}`,
+            {
+              method: "GET",
+              headers: getAuthorizationHeaders(
+                await adminClient.getAccessToken(),
+              ),
+            },
+          );
 
-        return response.arrayBuffer();
+          return await response.arrayBuffer();
+        } catch (error) {
+          // The server refuses to build the files when the client is missing a setting they need.
+          if (error instanceof NetworkError && error.response.status === 400) {
+            setError(error.message);
+            return "";
+          }
+          throw error;
+        }
       } else {
         const snippet = await adminClient.clients.getInstallationProviders({
           id,
@@ -93,7 +104,10 @@ export const DownloadDialog = ({
   );
 
   // Clear snippet when selected config changes, this prevents old snippets from being displayed during fetch.
-  useEffect(() => setSnippet(""), [id, selected]);
+  useEffect(() => {
+    setSnippet("");
+    setError(undefined);
+  }, [id, selected]);
 
   return (
     <ConfirmDialogModal
@@ -107,6 +121,7 @@ export const DownloadDialog = ({
       }}
       open={open}
       toggleDialog={toggleDialog}
+      confirmButtonDisabled={!!error}
       variant={ModalVariant.medium}
     >
       <Form>
@@ -160,6 +175,11 @@ export const DownloadDialog = ({
               </Select>
             </FormGroup>
           </StackItem>
+          {error && (
+            <StackItem>
+              <Alert variant="danger" isInline title={error} />
+            </StackItem>
+          )}
           {!selectedConfig?.downloadOnly && (
             <StackItem isFilled>
               <FormGroup

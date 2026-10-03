@@ -42,6 +42,7 @@ import org.keycloak.protocol.saml.SamlConfigAttributes;
 import org.keycloak.protocol.saml.SamlProtocol;
 import org.keycloak.protocol.saml.installation.SamlSPDescriptorClientInstallation;
 import org.keycloak.representations.idm.ClientScopeRepresentation;
+import org.keycloak.representations.idm.ErrorRepresentation;
 import org.keycloak.representations.idm.ProtocolMapperRepresentation;
 import org.keycloak.saml.common.constants.JBossSAMLURIConstants;
 import org.keycloak.testframework.annotations.InjectAdminEvents;
@@ -351,7 +352,36 @@ public class InstallationTest {
     }
 
     @Test
+    public void testModAuthMellonExportRequiresAssertionConsumerUrl() throws IOException {
+        try (Response response = samlClient.admin().getInstallationProviderAsResponse("mod-auth-mellon")) {
+            assertThat(response.getStatus(), is(equalTo(400)));
+            assertThat(response.readEntity(ErrorRepresentation.class).getErrorMessage(), containsString("Assertion Consumer Service"));
+        }
+
+        samlClient.updateWithCleanup(c -> c.adminUrl("https://admin-url"));
+        AdminEventAssertion.assertEvent(adminEvents.poll(), OperationType.UPDATE, AdminEventPaths.clientResourcePath(samlClient.getId()), ResourceType.CLIENT);
+
+        String spMetadata = null;
+        try (Response response = samlClient.admin().getInstallationProviderAsResponse("mod-auth-mellon")) {
+            assertThat(response.getStatus(), is(equalTo(200)));
+            try (ZipInputStream zis = new ZipInputStream(new ByteArrayInputStream(response.readEntity(byte[].class)))) {
+                ZipEntry entry;
+                while ((entry = zis.getNextEntry()) != null) {
+                    if (entry.getName().endsWith("sp-metadata.xml")) {
+                        spMetadata = new String(zis.readAllBytes(), StandardCharsets.UTF_8);
+                    }
+                }
+            }
+        }
+        assertThat(spMetadata, containsString("https://admin-url"));
+        assertThat(spMetadata, not(containsString("ERROR:ENDPOINT_NOT_SET")));
+    }
+
+    @Test
     public void testPemsInModAuthMellonExportShouldBeFormattedInRfc7468() throws IOException {
+        samlClient.updateWithCleanup(c -> c.adminUrl("https://admin-url"));
+        AdminEventAssertion.assertEvent(adminEvents.poll(), OperationType.UPDATE, AdminEventPaths.clientResourcePath(samlClient.getId()), ResourceType.CLIENT);
+
         Response response = samlClient.admin().getInstallationProviderAsResponse("mod-auth-mellon");
         byte[] result = response.readEntity(byte[].class);
 

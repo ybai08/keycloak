@@ -3,13 +3,17 @@ import { v4 as uuid } from "uuid";
 import adminClient from "../utils/AdminClient.ts";
 import { switchOff, switchOn } from "../utils/form.ts";
 import { login } from "../utils/login.ts";
-import { assertNotificationMessage } from "../utils/masthead.ts";
+import {
+  assertNotificationMessage,
+  selectActionToggleItem,
+} from "../utils/masthead.ts";
 import { assertModalTitle, cancelModal, confirmModal } from "../utils/modal.ts";
 import { goToClients } from "../utils/sidebar.ts";
 import { clickTableRowItem, searchItem } from "../utils/table.ts";
 import { goToAdvancedTab, revertFineGrain, saveFineGrain } from "./advanced.ts";
 import {
   assertCertificates,
+  assertDownloadRefused,
   assertEncryptionAlgorithm,
   assertEncryptionKeyAlgorithm,
   assertEncryptionDigestMethod,
@@ -119,6 +123,18 @@ test.describe.serial("Clients SAML tests", () => {
     page,
   }) => {
     await assertSamlClientDetails(page);
+  });
+
+  test("should not offer the mod_auth_mellon files without an assertion consumer URL", async ({
+    page,
+  }) => {
+    await selectActionToggleItem(page, "Download adapter config");
+    await assertModalTitle(page, "Download adaptor configs");
+    // The mod_auth_mellon files are the format the dialog opens with for a SAML client
+    await assertDownloadRefused(
+      page,
+      "The client has no Assertion Consumer Service URL.",
+    );
   });
 
   test("should save force name id format", async ({ page }) => {
